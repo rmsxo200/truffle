@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html xmlns:th="http//www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/default}">
+
+    <div layout:fragment="content">
+        <head>
+            <title> 여행 추가 </title>
+            <script>
+                window.onload = function() {
+                    //다음 단계 버튼 이벤트
+                    document.getElementById('next-step').addEventListener('click', () => {
+                        let selecttList = document.querySelectorAll('[name="select-destination"]'); //선택된 여행지 전체 조회
+
+                        if(selecttList.length <= 0) { //선택된 여행지가 없을 경우
+                            document.getElementById('select-alert').setAttribute('style', 'display:block');
+                            return false;
+                        }
+
+                        document.getElementById("destination-area").style.display = 'none'; //여행지 선택 영역 가리기
+                        document.getElementById("calendar-area").style.display = 'block'; //달력 선택 영역 보이기
+                        document.getElementById('select-alert').setAttribute('style', 'display:none');
+                    });
+
+                    //이전 단계 버튼 이벤트
+                    document.getElementById('prev-step').addEventListener('click', () => {
+                        document.getElementById("calendar-area").style.display = 'none'; //달력 선택 영역 숨기기
+                        document.getElementById("destination-area").style.display = 'block'; //여행지 선택 영역 보이기
+                    });
+
+                    //저장버튼 이벤트
+                    document.getElementById('save-travel').addEventListener('click', () => {
+                        addTravel();
+                    });
+
+                    //여행지 삭제 이벤트 등록
+                    document.getElementById('select-area').addEventListener('click', (event) => { //부모 div 클릭시
+                      if (event.target.getAttribute('name') === 'select-destination') {
+                        event.target.remove();
+                      }
+                    });
+
+                    //검색 텍스트박스 입력시 이벤트
+                    document.getElementById('search-input').addEventListener('input', (event) => {
+                        let searchText = event.target.value; // input 박스의 값 가져오기
+                        let destinationList = Array.from(document.querySelectorAll('span[name="destination"]'));
+
+                        if(searchText == "") { //공백일 경우
+                            destinationList.forEach(function(item) {
+                                item.setAttribute('style', 'display:block'); //전체 보임
+                            });
+                        } else { //입력한 텍스트가 있을 경우
+                            destinationList.forEach(function(item) {
+                                item.setAttribute('style', 'display:none'); //전체 숨김
+                            });
+
+                            destinationList.filter(item => item.textContent.includes(searchText)).forEach(function(item) {
+                                item.setAttribute('style', 'display:block'); //포함 요소 보여줌
+                            });
+                        }
+                    });
+
+                    getDestinationList(); //여행지역 조회 및 초기화
+                }
+
+                //여행지역 리스트 조회
+                async function getDestinationList() {
+                    try {
+                        const dstnResponse = await fetch('/dstn/list', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json', // JSON 형식의 데이터 전송
+                            },
+                        });
+
+                        // 응답 상태 체크
+                        if (!dstnResponse.ok) {
+                          throw new Error(`error status : ${dstnResponse.status}`);
+                        }
+
+                        // 응답 JSON 데이터 파싱
+                        const result = await dstnResponse.json();
+                        initDestination(result);
+                    } catch (error) {
+                        console.error('send error : ', error.message);
+                    }
+                }
+
+                //여행지역 영역 초기화
+                function initDestination(destinationList) {
+                    destinationList.forEach(function(item) {
+                        //여행지역 목록 엘리먼트 추가
+                        const dstnElement = document.createElement('span');
+                        dstnElement.setAttribute('name', 'destination');
+                        dstnElement.className = 'list-span';
+                        dstnElement.textContent = item.destinationName;
+                        dstnElement.dataset.code = item.destinationCd; //data-date 세팅
+                        document.getElementById('destination-list').appendChild(dstnElement);
+
+                        //여행지 요소에 클릭 이벤트 등록
+                        dstnElement.addEventListener('click', (event) => {
+                            //선택한 지역이 이미 추가된 지역인지 확인 후 추가
+                            if(null == document.getElementById('destination-' + event.target.dataset.code)) {
+                                const btnElement = document.createElement('button'); // 선택된 지역버튼 엘리먼트 추가
+                                btnElement.setAttribute('name', 'select-destination');
+                                btnElement.setAttribute("style","margin:5px");
+                                btnElement.id = 'destination-' + event.target.dataset.code;
+                                btnElement.className = 'btn btn-primary';
+                                btnElement.textContent = event.target.textContent + " ↻";
+                                btnElement.dataset.code = event.target.dataset.code; //data-date 세팅
+
+                                document.getElementById('select-area').appendChild(btnElement); //엘리먼트 추가
+                            }
+                        });
+                    });
+                }
+
+                //여행지 저장
+                async function addTravel() {
+                    let selectDate = getSelectDate();
+                    if(!selectDate) { // 날짜 미선택시
+                        return;
+                    }
+
+                    //여행지 리스트
+                    let destinationCdList = [];
+                    let selectList = document.querySelectorAll('[name="select-destination"]');
+                    selectList.forEach(function(item) {
+                        destinationCdList.push(item.dataset.code);
+                    });
+
+                    //전송 데이터
+                    let travelData = {
+                        "startDate":   selectDate.startDate,
+                        "endDate":   selectDate.endDate,
+                        "destinationCdList": destinationCdList,
+                    }
+
+                    try {
+                        const saveResponse = await fetch('/travel/info', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json', // JSON 형식의 데이터 전송
+                            },
+                            body: JSON.stringify(travelData), // 데이터를 JSON 문자열로 변환
+                        });
+
+                        // 응답 상태 체크
+                        if (!saveResponse.ok) {
+                            throw new Error(`error status : ${saveResponse.status}`); // 코드 실행을 중단, catch 블록 전달
+                        }
+
+                        // 응답 JSON 데이터 파싱
+                        const result = await saveResponse.json();
+
+                        //결과 메시지
+                        alert(result.message);
+                        location.href = "/index";
+                    } catch (error) {
+                        console.error('send error : ', error.message);
+                        alert("오류가 발생하였습니다.");
+                    }
+                }
+            </script>
+        </head>
+
+        <!-- 여행지 선택 영역 -->
+        <section class="page-section" id="destination-area">
+            <div class="container">
+                <!-- Section Heading-->
+                <h2 class="page-section-heading text-center text-uppercase text-secondary mb-0">여행지 선택</h2>
+                <!-- Icon Divider-->
+                <div class="divider-custom">
+                    <div class="divider-custom-line"></div>
+                    <div class="divider-custom-icon"><i class="fas fa-star"></i></div>
+                    <div class="divider-custom-line"></div>
+                </div>
+                <!-- Section contents-->
+                <div class="row justify-content-center">
+                    <div class="col-lg-8 col-xl-7">
+                        <div class="form-floating mb-3">
+                            <input class="form-control" id="search-input" placeholder="" data-sb-validations="required" />
+                            <label for="search-input">검색할 지역명을 입력해 주세요.</label>
+                            <div class="alert-text-div" id="select-alert">여행지를 선택해 주세요.</div>
+                        </div>
+
+                        <!-- 여행지 리스트 -->
+                        <div style="font-size:1.3rem">
+                            <!-- 선택한 여행지 -->
+                            <div id="select-area"></div>
+
+                            <div id="destination-list"></div>
+                        </div>
+
+                        <!-- Button-->
+                        <div class="text-center mt-4">
+                            <button id="next-step" class="btn btn-primary btn-xl" >다음 단계</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 달력 영역 -->
+        <section class="page-section" id="calendar-area" style="display:none;">
+            <div class="container">
+                <!-- Section Heading-->
+                <h2 class="page-section-heading text-center text-uppercase text-secondary mb-0">날짜 선택</h2>
+                <!-- Icon Divider-->
+                <div class="divider-custom">
+                    <div class="divider-custom-line"></div>
+                    <div class="divider-custom-icon"><i class="fas fa-star"></i></div>
+                    <div class="divider-custom-line"></div>
+                </div>
+
+                <!-- 달력 -->
+                <div class="row justify-content-center">
+                    <div class="col-xl-3">
+                        <div th:replace="/util/calendar.html :: calendar"></div>
+                    </div>
+                </div>
+
+                <!-- 바튼 -->
+                <div class="row justify-content-center">
+                    <div class="text-center mt-4">
+                        <button id="prev-step" class="btn btn-primary btn-xl" >이전 단계</button>
+                        <button id="save-travel" class="btn btn-primary btn-xl" >여행 만들기</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</html>

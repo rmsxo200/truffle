@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+    <head th:replace="~{fragments/config :: config}">
+        <title layout:title-pattern="$LAYOUT_TITLE : $CONTENT_TITLE"> Truffle </title>
+    </head>
+
+    <body id="page-top">
+        <!-- header -->
+        <header th:replace="~{fragments/header::header}"></header>
+
+        <!-- content -->
+        <div layout:fragment="content"></div>
+
+        <!-- footer -->
+        <div th:replace="~{fragments/footer::footer}"></div>
+
+    </body>
+</html>

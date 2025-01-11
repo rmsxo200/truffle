@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+</head>
+<body>
+<h2>회원가입</h2>
+<form th:action="@{/api/v1/signUp}" th:object="${signUpDTO}" method="post">
+  <label for="email">이메일:</label>
+  <input type="email" id="email" th:field="*{email}" required><br>
+
+  <label for="userName">이름:</label>
+  <input type="text" id="userName" th:field="*{userName}" required><br>
+
+  <label for="password">비밀번호:</label>
+  <input type="password" id="password" th:field="*{password}" required><br>
+
+  <button type="submit">회원가입</button>
+</form>
+</body>
+</html>

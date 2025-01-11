@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="calendar">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        #calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 40px);
+            gap: 5px;
+            margin: 20px 0;
+        }
+        .day {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+        .day.selected {
+            background-color: #007BFF;
+            color: white;
+        }
+        .day.range {
+            background-color: #d0e7ff;
+        }
+        .month-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .month-controls button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        #month-picker {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #month-picker select {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body th:fragment="calendar">
+<!-- 현재 선택 연월 표시 및 이전, 다음달 버튼 영역 -->
+<div class="month-controls">
+    <button id="prev-month">이전</button>
+    <div id="current-month" style="cursor: pointer;"></div>
+    <button id="next-month">다음</button>
+</div>
+
+<!-- 연월 선택 영역 -->
+<div id="month-picker">
+    <select id="year-select"></select>
+    <label for="year-select">년</label>
+    <select id="month-select"></select>
+    <label for="month-select">월</label>
+    <button id="apply-month">적용</button>
+</div>
+
+<!-- 달력 생성역역 -->
+<div id="calendar"></div>
+
+<script>
+    const today = new Date();
+    let year = today.getFullYear();
+    let month = today.getMonth(); // Current month (0-11)
+
+    let startDate = null;
+    let endDate = null;
+
+    //연월 선택부분 초기화
+    function populateYearAndMonthSelectors() {
+        const yearSelect = document.getElementById('year-select'); //연 셀렉트 박스
+        const monthSelect = document.getElementById('month-select'); //월 셀렉트 박스
+
+        yearSelect.innerHTML = ''; //셀렉트 박스 내용 비우기
+        monthSelect.innerHTML = ''; //셀렉트 박스 내용 비우기
+
+        for (let y = year - 10; y <= year + 10; y++) { //현재 연도 +-10년
+            const option = document.createElement('option');
+            option.value = y;
+            option.textContent = y;
+            if (y === year) option.selected = true;
+            yearSelect.appendChild(option); //셀렉트박스에 연도 항목 추가
+        }
+
+        const monthNames = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]; //월 배열
+        monthNames.forEach((name, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = name;
+            if (index === month) option.selected = true;
+            monthSelect.appendChild(option); //셀렉트박스에 월 항목 추가
+        });
+    }
+
+    //달력 생성
+    function generateCalendar(year, month) {
+        const calendar = document.getElementById('calendar'); //달력 생성 영역
+        calendar.innerHTML = ''; //내용 초기화
+
+        const firstDay = new Date(year, month, 1).getDay(); //시작 요일 (월요일 : 1 ~  일요일 : 7)
+        const daysInMonth = new Date(year, month + 1, 0).getDate(); //월의 마지막 일자
+
+        document.getElementById('current-month').textContent = `${year}년 ${month}월`; // 상단 선택 연월 세팅
+
+        for (let i = 0; i < firstDay; i++) { //시작요일 전까지 일자에 공란 추가
+            const emptySlot = document.createElement('div');
+            calendar.appendChild(emptySlot);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) { //달력에 일자 추가
+            const dayElement = document.createElement('div');
+            dayElement.className = 'day';
+            dayElement.textContent = day;
+            dayElement.dataset.date = new Date(year, month, day).toISOString().split('T')[0]; //data-date 세팅
+
+            //달 바뀌어도 선택 표시 유지시키는 부분
+            const date = new Date(year, month, day);
+            if (startDate && new Date(dayElement.dataset.date).getTime() === startDate.getTime()) {
+                dayElement.classList.add('selected');
+            }
+            if (endDate && new Date(dayElement.dataset.date).getTime() === endDate.getTime()) {
+                dayElement.classList.add('selected');
+            }
+            if (startDate && endDate && date >= startDate && date <= endDate) {
+                dayElement.classList.add('range');
+            }
+
+            dayElement.addEventListener('click', () => handleDateClick(dayElement)); //일자 클릭 이벤트 추가
+            calendar.appendChild(dayElement);
+        }
+    }
+
+    //일자 클릭 이벤트
+    function handleDateClick(dayElement) {
+        const selectedDate = new Date(dayElement.dataset.date); //선택 엘리먼트의 데이터셋 가져와 Date생성
+
+        if (!startDate || (startDate && endDate)) { //시작일 선택시 (시작일이 없거나 시작,종료 모두 선택 상태)
+            startDate = selectedDate;
+            endDate = null;
+            clearSelection(); //일자 선택 표시 class 삭제
+            dayElement.classList.add('selected'); //시작일 선택 표사
+        } else { //종료일 선택시
+            if (selectedDate < startDate) { //처음 선택한 일자보다 클 경우
+                endDate = startDate;
+                startDate = selectedDate;
+            } else {
+                endDate = selectedDate;
+            }
+            highlightRange();
+        }
+    }
+
+    //일자 선택 표시 class 삭제
+    function clearSelection() {
+        document.querySelectorAll('.day').forEach(day => {
+            day.classList.remove('selected', 'range');
+        });
+    }
+
+    //종료일자 표시
+    function highlightRange() {
+        if (startDate && endDate) { //시작일 종료일 전부 값이 존재할 경우
+            const days = document.querySelectorAll('.day');
+            days.forEach(day => {
+                const date = new Date(day.dataset.date);
+                if (date >= startDate && date <= endDate) {
+                    day.classList.add('range'); //종료일 표시
+                }
+            });
+
+            //document.querySelector(`.day[data-date="${startDate.toISOString().split('T')[0]}"]`).classList.add('selected');
+            document.querySelector(`.day[data-date="${endDate.toISOString().split('T')[0]}"]`).classList.add('selected');
+        }
+    }
+
+    //이전달 버튼 클릭
+    document.getElementById('prev-month').addEventListener('click', () => {
+        month--;
+        if (month < 0) {
+            month = 11;
+            year--;
+        }
+        generateCalendar(year, month);
+    });
+
+    //다음달 버튼 클릭
+    document.getElementById('next-month').addEventListener('click', () => {
+        month++;
+        if (month > 11) {
+            month = 0;
+            year++;
+        }
+        generateCalendar(year, month);
+    });
+
+    //현재 연월부분 클릭
+    document.getElementById('current-month').addEventListener('click', () => {
+        const monthPicker = document.getElementById('month-picker'); //연월 선택 영역
+        monthPicker.style.display = 'block'; //연월 선택 영역 보이기
+        populateYearAndMonthSelectors(); //연월 초기화
+    });
+
+    //연월 선택 적용
+    document.getElementById('apply-month').addEventListener('click', () => {
+        const yearSelect = document.getElementById('year-select');
+        const monthSelect = document.getElementById('month-select');
+
+        year = parseInt(yearSelect.value, 10);
+        month = parseInt(monthSelect.value, 10);
+
+        generateCalendar(year, month);
+        document.getElementById('month-picker').style.display = 'none';
+    });
+
+    generateCalendar(year, month); //최초 달력 생성
+
+    //시작일부터 종료일 사이 선택일자 모두 출력
+    function getAllSelectDate() {
+        if (!startDate || !endDate) {
+            alert('날짜를 선택해 주세요.');
+            return false;
+        }
+
+        let dateList = [];
+
+        let currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+            currentDate.setDate(currentDate.getDate() + 1);
+            dateList.push(currentDate.toISOString().split('T')[0]);
+        }
+
+        let result = {
+            "startDate" : startDate.toISOString().split('T')[0],
+            "endDate" : endDate.toISOString().split('T')[0],
+            "dateList" : dateList,
+        }
+        console.log(dateList);
+
+        return result;
+    }
+
+    //시작일, 종료일만 가져오기
+    function getSelectDate() {
+        if (!startDate || !endDate) {
+            alert('날짜를 선택해 주세요.');
+            return false;
+        }
+
+        startDate.setDate(startDate.getDate() + 1);
+        endDate.setDate(endDate.getDate() + 1);
+
+        let result = {
+            "startDate" : startDate.toISOString().split('T')[0],
+            "endDate" : endDate.toISOString().split('T')[0],
+        }
+
+        return result;
+    }
+</script>
+</body>
+</html>
